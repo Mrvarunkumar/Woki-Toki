@@ -1,0 +1,2293 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WalkieTalk — Instant Voice</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap"
+    rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    :root {
+      --bg0: #060a06;
+      --bg1: #0c120c;
+      --bg2: #111a11;
+      --bg3: #172017;
+      --card: #0f160f;
+      --border: #1e321e;
+      --border2: #2a482a;
+      --green: #00ff88;
+      --green2: #00cc66;
+      --green3: #009944;
+      --green-dim: #004422;
+      --green-glow: rgba(0, 255, 136, 0.15);
+      --red: #ff3b3b;
+      --red-dim: #3b0000;
+      --yellow: #ffd600;
+      --yellow-dim: #3b3000;
+      --text: #c8e8c8;
+      --text2: #6b8f6b;
+      --text3: #3a5a3a;
+      --font-hud: 'Orbitron', monospace;
+      --font-body: 'Rajdhani', sans-serif;
+      --font-mono: 'Share Tech Mono', monospace;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      height: 100%;
+      height: 100dvh;
+      background: var(--bg0);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 16px;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ─── SCANLINE OVERLAY ─────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(to bottom,
+          transparent 0px,
+          transparent 2px,
+          rgba(0, 0, 0, 0.08) 2px,
+          rgba(0, 0, 0, 0.08) 4px);
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ─── LAYOUT ───────────────────────────────────────────── */
+    #app {
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .screen {
+      display: none;
+      width: 100%;
+      max-width: 480px;
+      height: 100vh;
+      height: 100dvh;
+      max-height: 900px;
+      flex-direction: column;
+      background: var(--bg1);
+      position: relative;
+      overflow: hidden;
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    /* ─── TOP BAR ──────────────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg0);
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .topbar::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--green), transparent);
+      opacity: 0.4;
+    }
+
+    .logo {
+      font-family: var(--font-hud);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--green);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    .logo span {
+      color: var(--text2);
+      font-weight: 400;
+    }
+
+    .signal-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 16px;
+    }
+
+    .signal-bars .bar {
+      width: 4px;
+      background: var(--green3);
+      border-radius: 1px;
+      animation: signal-pulse 2s ease-in-out infinite;
+    }
+
+    .signal-bars .bar:nth-child(1) {
+      height: 4px;
+      animation-delay: 0s;
+    }
+
+    .signal-bars .bar:nth-child(2) {
+      height: 7px;
+      animation-delay: 0.15s;
+    }
+
+    .signal-bars .bar:nth-child(3) {
+      height: 10px;
+      animation-delay: 0.3s;
+    }
+
+    .signal-bars .bar:nth-child(4) {
+      height: 14px;
+      animation-delay: 0.45s;
+      background: var(--green);
+    }
+
+    .icon-btn {
+      background: none;
+      border: 1px solid var(--border2);
+      color: var(--text2);
+      width: 34px;
+      height: 34px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+
+    .icon-btn:hover {
+      border-color: var(--green3);
+      color: var(--green);
+    }
+
+    /* ─── SCROLLABLE CONTENT ───────────────────────────────── */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border2) transparent;
+    }
+
+    /* ─── ID CARD ──────────────────────────────────────────── */
+    .id-card {
+      background: var(--card);
+      border: 1px solid var(--border2);
+      border-radius: 12px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .id-card::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(ellipse at center, var(--green-glow) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .id-card-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text3);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .wtk-id-display {
+      font-family: var(--font-hud);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--green);
+      letter-spacing: 4px;
+      text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+      margin-bottom: 14px;
+      word-break: break-all;
+    }
+
+    .id-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-sm {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      cursor: pointer;
+      border: 1px solid;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+
+    .btn-outline {
+      background: transparent;
+      border-color: var(--border2);
+      color: var(--text2);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--green3);
+      color: var(--green);
+    }
+
+    .btn-green {
+      background: var(--green-dim);
+      border-color: var(--green3);
+      color: var(--green);
+    }
+
+    .btn-green:hover {
+      background: var(--green3);
+      color: var(--bg0);
+    }
+
+    .btn-red {
+      background: var(--red-dim);
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    /* ─── QR SECTION ───────────────────────────────────────── */
+    .qr-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    #qr-canvas {
+      width: 72px !important;
+      height: 72px !important;
+      border-radius: 6px;
+      overflow: hidden;
+      flex-shrink: 0;
+      background: white;
+      padding: 4px;
+    }
+
+    #qr-canvas canvas,
+    #qr-canvas img {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .qr-info {
+      flex: 1;
+    }
+
+    .qr-info p {
+      font-size: 12px;
+      color: var(--text2);
+      line-height: 1.6;
+    }
+
+    .qr-info strong {
+      color: var(--text);
+    }
+
+    /* ─── CONNECT INPUT ────────────────────────────────────── */
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text3);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .connect-box {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .wtk-input {
+      flex: 1;
+      background: var(--bg0);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-family: var(--font-hud);
+      font-size: 16px;
+      /* prevent iOS auto-zoom */
+      color: var(--green);
+      letter-spacing: 2px;
+      outline: none;
+      transition: border-color 0.2s;
+      min-width: 0;
+    }
+
+    .wtk-input::placeholder {
+      color: var(--text3);
+      font-size: 13px;
+      letter-spacing: 1px;
+    }
+
+    .wtk-input:focus {
+      border-color: var(--green3);
+      box-shadow: 0 0 0 2px rgba(0, 153, 68, 0.15);
+    }
+
+    .connect-btn {
+      background: var(--green);
+      border: none;
+      border-radius: 8px;
+      width: 48px;
+      cursor: pointer;
+      font-size: 20px;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .connect-btn:hover {
+      background: var(--green2);
+      transform: scale(1.05);
+    }
+
+    .connect-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* ─── ROOM ACTIONS ─────────────────────────────────────── */
+    .room-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .room-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .room-card:hover {
+      border-color: var(--green3);
+      background: var(--bg2);
+    }
+
+    .room-card:active {
+      transform: scale(0.98);
+    }
+
+    .room-card .icon {
+      font-size: 22px;
+    }
+
+    .room-card .title {
+      font-family: var(--font-body);
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text);
+      letter-spacing: 0.5px;
+    }
+
+    .room-card .desc {
+      font-size: 11px;
+      color: var(--text2);
+      line-height: 1.4;
+    }
+
+    /* ─── CONTACTS ─────────────────────────────────────────── */
+    .contact-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .contact-item:hover {
+      border-color: var(--green3);
+    }
+
+    .contact-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--green-dim);
+      border: 1px solid var(--green3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-hud);
+      font-size: 11px;
+      color: var(--green);
+      flex-shrink: 0;
+    }
+
+    .contact-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .contact-id {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--green);
+      letter-spacing: 1px;
+    }
+
+    .contact-name {
+      font-size: 11px;
+      color: var(--text2);
+      margin-top: 1px;
+    }
+
+    .contact-arrow {
+      color: var(--text3);
+      font-size: 14px;
+    }
+
+    .online-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      flex-shrink: 0;
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    .online-dot.offline {
+      background: var(--text3);
+      box-shadow: none;
+      animation: none;
+    }
+
+    /* ─── CALL SCREEN ──────────────────────────────────────── */
+    #screen-call .content {
+      justify-content: space-between;
+      padding: 24px 20px;
+    }
+
+    .peer-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .peer-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: var(--bg0);
+      border: 2px solid var(--green3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-hud);
+      font-size: 20px;
+      color: var(--green);
+      position: relative;
+    }
+
+    .peer-avatar.speaking::after {
+      content: '';
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      border: 2px solid var(--green);
+      animation: ring-expand 1.2s ease-out infinite;
+    }
+
+    .peer-avatar.speaking::before {
+      content: '';
+      position: absolute;
+      inset: -18px;
+      border-radius: 50%;
+      border: 1px solid var(--green);
+      animation: ring-expand 1.2s ease-out infinite 0.4s;
+    }
+
+    .peer-name {
+      font-family: var(--font-body);
+      font-weight: 700;
+      font-size: 20px;
+      color: var(--text);
+      letter-spacing: 1px;
+    }
+
+    .peer-id {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text2);
+      letter-spacing: 2px;
+    }
+
+    .peer-status {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--green);
+      letter-spacing: 2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .peer-status::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: blink 1.5s ease-in-out infinite;
+    }
+
+    /* ─── WAVE VISUALIZER ──────────────────────────────────── */
+    .wave-viz {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      height: 40px;
+    }
+
+    .wave-viz .wbar {
+      width: 4px;
+      background: var(--green3);
+      border-radius: 2px;
+      height: 6px;
+      transition: height 0.1s;
+    }
+
+    .wave-viz.active .wbar {
+      animation: wave-dance 0.8s ease-in-out infinite;
+    }
+
+    .wave-viz.active .wbar:nth-child(1) {
+      animation-delay: 0s;
+    }
+
+    .wave-viz.active .wbar:nth-child(2) {
+      animation-delay: 0.1s;
+    }
+
+    .wave-viz.active .wbar:nth-child(3) {
+      animation-delay: 0.2s;
+    }
+
+    .wave-viz.active .wbar:nth-child(4) {
+      animation-delay: 0.1s;
+    }
+
+    .wave-viz.active .wbar:nth-child(5) {
+      animation-delay: 0s;
+    }
+
+    .wave-viz.active .wbar:nth-child(6) {
+      animation-delay: 0.15s;
+    }
+
+    .wave-viz.active .wbar:nth-child(7) {
+      animation-delay: 0.05s;
+    }
+
+    /* ─── PTT BUTTON ───────────────────────────────────────── */
+    .ptt-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .ptt-ring {
+      position: relative;
+      width: clamp(140px, 45vw, 180px);
+      height: clamp(140px, 45vw, 180px);
+    }
+
+    .ptt-btn {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: var(--bg0);
+      border: 2px solid var(--border2);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+      font-family: var(--font-hud);
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--text2);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none;
+    }
+
+    .ptt-btn .mic-icon {
+      font-size: 36px;
+      transition: all 0.15s;
+    }
+
+    .ptt-btn .ptt-label {
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* PTT States */
+    .ptt-btn.idle {
+      border-color: var(--border2);
+      color: var(--text2);
+    }
+
+    .ptt-btn.requesting {
+      border-color: var(--yellow);
+      color: var(--yellow);
+      animation: requesting-pulse 0.6s ease-in-out infinite;
+    }
+
+    .ptt-btn.transmitting {
+      border-color: var(--green);
+      color: var(--green);
+      background: var(--green-dim);
+      box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.4);
+      animation: transmit-glow 0.8s ease-in-out infinite;
+    }
+
+    .ptt-btn.busy {
+      border-color: var(--red);
+      color: var(--red);
+      background: var(--red-dim);
+    }
+
+    .ptt-ripple {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .ptt-ripple .r {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 1px solid var(--green);
+      opacity: 0;
+    }
+
+    .ptt-btn.transmitting~.ptt-ripple .r:nth-child(1) {
+      animation: ripple-out 1.5s ease-out infinite;
+    }
+
+    .ptt-btn.transmitting~.ptt-ripple .r:nth-child(2) {
+      animation: ripple-out 1.5s ease-out infinite 0.5s;
+    }
+
+    .ptt-btn.transmitting~.ptt-ripple .r:nth-child(3) {
+      animation: ripple-out 1.5s ease-out infinite 1s;
+    }
+
+    .ptt-hint {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text3);
+      letter-spacing: 2px;
+      text-align: center;
+    }
+
+    .ptt-hint kbd {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      padding: 2px 6px;
+      color: var(--text2);
+      font-family: var(--font-mono);
+    }
+
+    /* ─── STATUS ROW ───────────────────────────────────────── */
+    .call-status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 16px;
+      background: var(--bg0);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .call-timer {
+      font-family: var(--font-hud);
+      font-size: 14px;
+      color: var(--green);
+      letter-spacing: 2px;
+    }
+
+    .call-quality {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text2);
+      letter-spacing: 1px;
+    }
+
+    .end-call-btn {
+      background: var(--red-dim);
+      border: 1px solid var(--red);
+      border-radius: 8px;
+      color: var(--red);
+      padding: 12px 24px;
+      font-family: var(--font-body);
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 2px;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+
+    .end-call-btn:hover {
+      background: var(--red);
+      color: white;
+    }
+
+    /* ─── ROOM SCREEN ──────────────────────────────────────── */
+    .room-header-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .room-code-display {
+      font-family: var(--font-hud);
+      font-size: 11px;
+      color: var(--green);
+      letter-spacing: 3px;
+    }
+
+    .room-users-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .room-user-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .room-user-avatar {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: var(--bg0);
+      border: 1px solid var(--border2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-hud);
+      font-size: 12px;
+      color: var(--text2);
+      position: relative;
+      transition: all 0.2s;
+    }
+
+    .room-user-avatar.speaking {
+      border-color: var(--green);
+      color: var(--green);
+      box-shadow: 0 0 12px rgba(0, 255, 136, 0.3);
+    }
+
+    .room-user-avatar.me {
+      border-color: var(--green3);
+      color: var(--green);
+    }
+
+    .room-user-name {
+      font-size: 10px;
+      color: var(--text2);
+      letter-spacing: 0.5px;
+      text-align: center;
+      max-width: 60px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ─── MODAL ────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg1);
+      border: 1px solid var(--border2);
+      border-radius: 16px 16px 0 0;
+      padding: 24px 20px 36px;
+      width: 100%;
+      max-width: 420px;
+      animation: slide-up 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-handle {
+      width: 36px;
+      height: 4px;
+      background: var(--border2);
+      border-radius: 2px;
+      margin: 0 auto 8px;
+    }
+
+    .modal-title {
+      font-family: var(--font-hud);
+      font-size: 14px;
+      color: var(--text);
+      letter-spacing: 2px;
+      text-align: center;
+    }
+
+    /* ─── TOAST ────────────────────────────────────────────── */
+    #toast-container {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+      width: 360px;
+      max-width: 90vw;
+    }
+
+    .toast {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text);
+      letter-spacing: 1px;
+      animation: toast-in 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toast.success {
+      border-color: var(--green3);
+      color: var(--green);
+    }
+
+    .toast.error {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    .toast.warn {
+      border-color: var(--yellow);
+      color: var(--yellow);
+    }
+
+    /* ─── INCOMING CALL ────────────────────────────────────── */
+    .incoming-info {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .incoming-from {
+      font-family: var(--font-hud);
+      font-size: 18px;
+      color: var(--green);
+      letter-spacing: 3px;
+    }
+
+    .incoming-sub {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text2);
+      letter-spacing: 2px;
+    }
+
+    .incoming-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .btn-accept {
+      background: var(--green-dim);
+      border: 1px solid var(--green);
+      border-radius: 8px;
+      color: var(--green);
+      padding: 14px;
+      font-family: var(--font-body);
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+
+    .btn-accept:hover {
+      background: var(--green);
+      color: var(--bg0);
+    }
+
+    .btn-decline {
+      background: var(--red-dim);
+      border: 1px solid var(--red);
+      border-radius: 8px;
+      color: var(--red);
+      padding: 14px;
+      font-family: var(--font-body);
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+
+    .btn-decline:hover {
+      background: var(--red);
+      color: white;
+    }
+
+    /* ─── ROOM JOIN MODAL ──────────────────────────────────── */
+    .room-code-input {
+      background: var(--bg0);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--font-hud);
+      font-size: 24px;
+      color: var(--green);
+      letter-spacing: 8px;
+      text-align: center;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .room-code-input:focus {
+      border-color: var(--green3);
+    }
+
+    .room-code-input::placeholder {
+      color: var(--text3);
+      font-size: 18px;
+      letter-spacing: 4px;
+    }
+
+    .btn-full {
+      width: 100%;
+      padding: 14px;
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 2px;
+      cursor: pointer;
+      border: 1px solid;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+
+    /* ─── ANIMATIONS ───────────────────────────────────────── */
+    @keyframes signal-pulse {
+
+      0%,
+      100% {
+        opacity: 0.5;
+      }
+
+      50% {
+        opacity: 1;
+      }
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
+    }
+
+    @keyframes wave-dance {
+
+      0%,
+      100% {
+        height: 6px;
+      }
+
+      50% {
+        height: 28px;
+      }
+    }
+
+    @keyframes ripple-out {
+      0% {
+        transform: scale(1);
+        opacity: 0.6;
+      }
+
+      100% {
+        transform: scale(1.8);
+        opacity: 0;
+      }
+    }
+
+    @keyframes ring-expand {
+      0% {
+        transform: scale(1);
+        opacity: 0.8;
+      }
+
+      100% {
+        transform: scale(1.6);
+        opacity: 0;
+      }
+    }
+
+    @keyframes transmit-glow {
+
+      0%,
+      100% {
+        box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+      }
+
+      50% {
+        box-shadow: 0 0 40px rgba(0, 255, 136, 0.6);
+      }
+    }
+
+    @keyframes requesting-pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    @keyframes slide-up {
+      from {
+        transform: translateY(100%);
+      }
+
+      to {
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes toast-in {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* ─── MISC ─────────────────────────────────────────────── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0 -20px;
+    }
+
+    .back-btn {
+      background: none;
+      border: none;
+      color: var(--text2);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      transition: color 0.2s;
+    }
+
+    .back-btn:hover {
+      color: var(--green);
+    }
+
+    .connected-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--green);
+      letter-spacing: 2px;
+      background: var(--green-dim);
+      border: 1px solid var(--green3);
+      border-radius: 20px;
+      padding: 3px 10px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .connected-badge::before {
+      content: '';
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: blink 1.5s ease-in-out infinite;
+    }
+
+    audio {
+      display: none;
+    }
+
+    @media (max-width: 440px) {
+      .screen {
+        border: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="app">
+
+    <!-- ═══ HOME SCREEN ═══════════════════════════════════════ -->
+    <div class="screen active" id="screen-home">
+      <div class="topbar">
+        <div class="logo">WalkieTalk <span>v2.0</span></div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="signal-bars">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+          </div>
+          <button class="icon-btn" onclick="showSettings()" title="Settings">⚙</button>
+        </div>
+      </div>
+
+      <div class="content">
+
+        <!-- YOUR ID -->
+        <div class="id-card">
+          <div class="id-card-label">◈ Your Walkie ID</div>
+          <div class="wtk-id-display" id="home-wtk-id">WTK-····-····</div>
+          <div class="id-actions">
+            <button class="btn-sm btn-outline" onclick="copyId()">⧉ Copy</button>
+            <button class="btn-sm btn-green" onclick="shareId()">↑ Share</button>
+            <button class="btn-sm btn-outline" onclick="toggleQR()">▣ QR</button>
+          </div>
+          <div class="qr-row" id="qr-row" style="display:none;">
+            <div id="qr-canvas"></div>
+            <div class="qr-info">
+              <p><strong>Share your QR</strong><br>Friends scan this to connect with you instantly — no typing needed.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- CONNECT -->
+        <div>
+          <div class="section-label">◈ Connect to someone</div>
+          <div class="connect-box">
+            <input class="wtk-input" id="connect-input" placeholder="WTK-XXXX-0000" maxlength="13"
+              oninput="formatIdInput(this)" onkeydown="if(event.key==='Enter') initiateCall()" />
+            <button class="connect-btn" onclick="initiateCall()" title="Connect">▶</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- ROOM ACTIONS -->
+        <div>
+          <div class="section-label">◈ Group Channels</div>
+          <div class="room-grid">
+            <div class="room-card" onclick="createRoom()">
+              <div class="icon">⊕</div>
+              <div class="title">Create Room</div>
+              <div class="desc">Start a group channel & share code</div>
+            </div>
+            <div class="room-card" onclick="showJoinRoom()">
+              <div class="icon">#</div>
+              <div class="title">Join Room</div>
+              <div class="desc">Enter a 4-digit room code</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- RECENT CONTACTS -->
+        <div>
+          <div class="section-label">◈ Recent Contacts</div>
+          <div id="contacts-list" style="display:flex;flex-direction:column;gap:8px;">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══ CALL SCREEN ════════════════════════════════════════ -->
+    <div class="screen" id="screen-call">
+      <div class="topbar">
+        <button class="back-btn" onclick="endCall()">← Back</button>
+        <div class="room-header-info">
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text2);text-align:center;"
+            id="call-peer-id-top">WTK-····-····</div>
+        </div>
+        <div class="connected-badge" id="call-badge">LIVE</div>
+      </div>
+
+      <div class="content">
+
+        <!-- PEER INFO -->
+        <div class="peer-section">
+          <div class="peer-avatar" id="peer-avatar">AB</div>
+          <div class="peer-name" id="peer-name-display">Connecting...</div>
+          <div class="peer-id" id="peer-id-display">WTK-····-····</div>
+          <div class="peer-status" id="peer-status">LISTENING</div>
+        </div>
+
+        <!-- WAVE VIZ -->
+        <div class="wave-viz" id="wave-viz">
+          <div class="wbar"></div>
+          <div class="wbar"></div>
+          <div class="wbar"></div>
+          <div class="wbar"></div>
+          <div class="wbar"></div>
+          <div class="wbar"></div>
+          <div class="wbar"></div>
+        </div>
+
+        <!-- CALL STATUS -->
+        <div class="call-status-row">
+          <div class="call-timer" id="call-timer">00:00</div>
+          <div class="call-quality">● SECURE · OPUS 16K</div>
+        </div>
+
+        <!-- PTT BUTTON -->
+        <div class="ptt-section">
+          <div class="ptt-ring" id="ptt-ring">
+            <button class="ptt-btn idle" id="ptt-btn" onmousedown="pttPress()" onmouseup="pttRelease()"
+              ontouchstart="pttPress(event)" ontouchend="pttRelease(event)">
+              <span class="mic-icon">🎙</span>
+              <span class="ptt-label" id="ptt-label">HOLD TO TALK</span>
+            </button>
+            <div class="ptt-ripple">
+              <div class="r"></div>
+              <div class="r"></div>
+              <div class="r"></div>
+            </div>
+          </div>
+          <div class="ptt-hint">Hold <kbd>SPACE</kbd> or touch button to transmit</div>
+        </div>
+
+        <!-- END CALL -->
+        <button class="end-call-btn" onclick="endCall()">✕ End Call</button>
+
+      </div>
+    </div>
+
+    <!-- ═══ ROOM SCREEN ════════════════════════════════════════ -->
+    <div class="screen" id="screen-room">
+      <div class="topbar">
+        <button class="back-btn" onclick="leaveRoom()">← Back</button>
+        <div class="room-header-info">
+          <div style="font-family:var(--font-hud);font-size:13px;color:var(--text);">GROUP ROOM</div>
+          <div class="room-code-display" id="room-code-top">#····</div>
+        </div>
+        <div class="connected-badge">LIVE</div>
+      </div>
+
+      <div class="content">
+
+        <!-- ROOM USERS -->
+        <div>
+          <div class="section-label">◈ In this channel — <span id="room-user-count">0</span> users</div>
+          <div class="room-users-grid" id="room-users-grid"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- ROOM CODE SHARE -->
+        <div class="id-card" style="padding:16px;">
+          <div class="id-card-label">◈ Room Code — Share with friends</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <div class="wtk-id-display" id="room-code-display" style="font-size:28px;letter-spacing:8px;">#····</div>
+            <button class="btn-sm btn-green" style="white-space:nowrap;" onclick="copyRoomCode()">⧉ Copy</button>
+          </div>
+        </div>
+
+        <!-- WAVE VIZ -->
+        <div class="wave-viz" id="room-wave-viz">
+          <div class="wbar"></div>
+          <div class="wbar"></div>
+          <div class="wbar"></div>
+          <div class="wbar"></div>
+          <div class="wbar"></div>
+          <div class="wbar"></div>
+          <div class="wbar"></div>
+        </div>
+        <div
+          style="font-family:var(--font-mono);font-size:11px;color:var(--text3);text-align:center;letter-spacing:2px;"
+          id="room-speaker-label">CHANNEL CLEAR</div>
+
+        <!-- PTT BUTTON -->
+        <div class="ptt-section">
+          <div class="ptt-ring" id="room-ptt-ring">
+            <button class="ptt-btn idle" id="room-ptt-btn" onmousedown="pttPress('room')" onmouseup="pttRelease('room')"
+              ontouchstart="pttPress(event,'room')" ontouchend="pttRelease(event,'room')">
+              <span class="mic-icon">🎙</span>
+              <span class="ptt-label" id="room-ptt-label">HOLD TO TALK</span>
+            </button>
+            <div class="ptt-ripple">
+              <div class="r"></div>
+              <div class="r"></div>
+              <div class="r"></div>
+            </div>
+          </div>
+          <div class="ptt-hint">Hold <kbd>SPACE</kbd> or touch button to transmit</div>
+        </div>
+
+        <button class="end-call-btn" onclick="leaveRoom()">✕ Leave Room</button>
+
+      </div>
+    </div>
+
+  </div><!-- #app -->
+
+  <!-- ═══ MODALS ═══════════════════════════════════════════════ -->
+
+  <!-- INCOMING CALL -->
+  <div class="modal-overlay" id="modal-incoming">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div style="text-align:center;font-family:var(--font-mono);font-size:10px;color:var(--text3);letter-spacing:3px;">
+        INCOMING CALL</div>
+      <div class="incoming-info">
+        <div class="incoming-from" id="incoming-id">WTK-····-····</div>
+        <div class="incoming-sub" id="incoming-name">Unknown caller</div>
+      </div>
+      <div class="incoming-actions">
+        <button class="btn-decline" onclick="declineCall()">✕ Decline</button>
+        <button class="btn-accept" onclick="acceptCall()">✓ Accept</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JOIN ROOM -->
+  <div class="modal-overlay" id="modal-join-room">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">JOIN ROOM</div>
+      <input class="room-code-input" id="join-code-input" placeholder="0000" maxlength="4" type="tel"
+        oninput="this.value=this.value.replace(/\D/g,'')" onkeydown="if(event.key==='Enter') confirmJoinRoom()" />
+      <button class="btn-full btn-green" onclick="confirmJoinRoom()">Join Channel</button>
+      <button class="btn-full btn-outline" style="margin-top:-8px;"
+        onclick="closeModal('modal-join-room')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="modal-overlay" id="modal-settings">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">SETTINGS</div>
+      <div>
+        <div class="section-label">Display Name</div>
+        <input class="wtk-input" id="settings-name" placeholder="Your name (optional)"
+          style="width:100%;letter-spacing:1px;font-size:15px;" maxlength="20" />
+      </div>
+      <div>
+        <div class="section-label">Your Walkie ID</div>
+        <div class="wtk-id-display" id="settings-wtk-id" style="font-size:16px;"></div>
+      </div>
+      <button class="btn-full btn-green" onclick="saveSettings()">Save</button>
+      <button class="btn-full btn-outline" style="margin-top:-8px;"
+        onclick="closeModal('modal-settings')">Close</button>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container"></div>
+
+  <audio id="audio-remote" autoplay></audio>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════════
+    // CONFIG — update BASE_URL if server runs on a different host
+    // ═══════════════════════════════════════════════════════════════
+    const BASE_URL = window.location.origin;           // e.g. http://127.0.0.1:8000
+    const WS_URL = BASE_URL.replace(/^http/, 'ws'); // ws://  or  wss://
+
+    // ═══════════════════════════════════════════════════════════════
+    // STATE
+    // ═══════════════════════════════════════════════════════════════
+    const state = {
+      wtkId: null,
+      username: null,
+      currentScreen: 'home',
+      pttState: 'idle',
+      roomPttState: 'idle',
+      callPeerId: null,
+      callPeerName: null,
+      callStartTime: null,
+      callTimerInterval: null,
+      currentRoomCode: null,
+      roomUsers: [],
+      contacts: [],
+      qrVisible: false,
+      incomingCallId: null,
+      incomingCallName: null,
+      micStream: null,
+      ws: null,
+      pc: null,           // RTCPeerConnection for active call
+      wsReconnectTimer: null,
+    };
+
+    // ═══════════════════════════════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════════════════════════════
+    async function init() {
+      loadSettings();
+      await loginToServer();
+      await loadContactsFromServer();
+      renderContacts();
+      connectWebSocket();
+      requestMicPermission();
+      setupKeyboardPTT();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SERVER AUTH
+    // ═══════════════════════════════════════════════════════════════
+    async function loginToServer() {
+      const savedId = localStorage.getItem('wtk_id');
+      const savedName = localStorage.getItem('wtk_username') || 'User';
+      try {
+        const res = await fetch(`${BASE_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: savedName, wtk_id: savedId }),
+        });
+        const data = await res.json();
+        state.wtkId = data.wtk_id;
+        state.username = data.name;
+        localStorage.setItem('wtk_id', data.wtk_id);
+        document.getElementById('home-wtk-id').textContent = data.wtk_id;
+        document.getElementById('settings-wtk-id').textContent = data.wtk_id;
+        generateQR(data.wtk_id);
+      } catch (e) {
+        // Offline fallback — generate id client-side
+        console.warn('Server unreachable, using local ID');
+        let id = savedId || generateWTKId();
+        localStorage.setItem('wtk_id', id);
+        state.wtkId = id;
+        document.getElementById('home-wtk-id').textContent = id;
+        document.getElementById('settings-wtk-id').textContent = id;
+        generateQR(id);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // WEBSOCKET
+    // ═══════════════════════════════════════════════════════════════
+    function connectWebSocket() {
+      if (!state.wtkId) return;
+      const ws = new WebSocket(`${WS_URL}/ws/${state.wtkId}`);
+      state.ws = ws;
+
+      ws.onopen = () => {
+        console.log('WS connected');
+        if (state.wsReconnectTimer) { clearTimeout(state.wsReconnectTimer); state.wsReconnectTimer = null; }
+        // Keepalive ping every 25s
+        ws._pingInterval = setInterval(() => ws.readyState === 1 && ws.send(JSON.stringify({ type: 'ping' })), 25000);
+      };
+
+      ws.onmessage = (ev) => {
+        try { handleServerMessage(JSON.parse(ev.data)); }
+        catch (e) { console.error('WS parse error', e); }
+      };
+
+      ws.onclose = () => {
+        clearInterval(ws._pingInterval);
+        console.log('WS closed — reconnecting in 3s');
+        state.wsReconnectTimer = setTimeout(connectWebSocket, 3000);
+      };
+
+      ws.onerror = () => ws.close();
+    }
+
+    function wsSend(payload) {
+      if (state.ws && state.ws.readyState === 1) {
+        state.ws.send(JSON.stringify(payload));
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SERVER MESSAGE HANDLER
+    // ═══════════════════════════════════════════════════════════════
+    function handleServerMessage(msg) {
+      switch (msg.type) {
+
+        // ── Presence ──────────────────────────────────────────────
+        case 'user_online':
+          updateContactOnline(msg.wtk_id, true); break;
+        case 'user_offline':
+          updateContactOnline(msg.wtk_id, false); break;
+
+        // ── WebRTC signaling ──────────────────────────────────────
+        case 'incoming_call':
+          showIncomingCall(msg.from_id, msg.from_name, msg.offer); break;
+
+        case 'call_answered':
+          handleCallAnswered(msg.from_id, msg.answer); break;
+
+        case 'call_declined':
+          showToast('Call declined', 'error');
+          cleanupCall(); break;
+
+        case 'call_ended':
+          showToast('Call ended by peer', 'error');
+          endCall(); break;
+
+        case 'ice_candidate':
+          if (state.pc && msg.candidate) {
+            state.pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(() => { });
+          }
+          break;
+
+        case 'call_error':
+          showToast(msg.detail || 'Call failed', 'error');
+          cleanupCall(); break;
+
+        // ── PTT ───────────────────────────────────────────────────
+        case 'ptt_granted':
+          setPTTState('transmitting', 'room');
+          enableMic();
+          document.getElementById('room-wave-viz').classList.add('active');
+          document.getElementById('room-speaker-label').textContent = '▶ YOU ARE TRANSMITTING';
+          playBeep('start');
+          break;
+
+        case 'ptt_denied':
+          setPTTState('busy', 'room');
+          showToast('Channel busy — wait for speaker', 'warn');
+          setTimeout(() => setPTTState('idle', 'room'), 1500);
+          break;
+
+        case 'ptt_started':
+          setPTTState('busy', 'room');
+          document.getElementById('room-speaker-label').textContent = `▶ ${msg.name} IS TRANSMITTING`;
+          document.getElementById('room-wave-viz').classList.add('active');
+          break;
+
+        case 'ptt_released':
+          if (state.roomPttState === 'busy') setPTTState('idle', 'room');
+          document.getElementById('room-speaker-label').textContent = 'CHANNEL CLEAR';
+          document.getElementById('room-wave-viz').classList.remove('active');
+          break;
+
+        // ── Room events ───────────────────────────────────────────
+        case 'room_user_joined':
+          if (msg.room_code === state.currentRoomCode) {
+            if (!state.roomUsers.find(u => u.id === msg.wtk_id)) {
+              state.roomUsers.push({ id: msg.wtk_id, name: msg.name, me: false });
+              renderRoomUsers();
+            }
+            showToast(`${msg.name} joined the channel`, 'success');
+          }
+          break;
+
+        case 'room_user_left':
+          if (msg.room_code === state.currentRoomCode) {
+            state.roomUsers = state.roomUsers.filter(u => u.id !== msg.wtk_id);
+            renderRoomUsers();
+            showToast('A user left the channel', 'error');
+          }
+          break;
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ID SYSTEM
+    // ═══════════════════════════════════════════════════════════════
+    const CONSONANTS = 'BCDFGHJKLMNPQRSTVWXYZ';
+    function generateWTKId() {
+      const letters = Array.from({ length: 4 }, () =>
+        CONSONANTS[Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] % CONSONANTS.length)]
+      ).join('');
+      const digits = String(Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] % 9000) + 1000);
+      return `WTK-${letters}-${digits}`;
+    }
+
+    function generateQR(id) {
+      const el = document.getElementById('qr-canvas');
+      el.innerHTML = '';
+      new QRCode(el, { text: id, width: 64, height: 64, colorDark: '#00ff88', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+    }
+
+    function formatIdInput(input) {
+      let v = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (v.startsWith('WTK')) v = v.slice(3);
+      const letters = v.replace(/[^A-Z]/g, '').slice(0, 4);
+      const digits = v.replace(/[^0-9]/g, '').slice(0, 4);
+      let out = 'WTK-' + letters;
+      if (letters.length === 4) out += '-' + digits;
+      input.value = out;
+    }
+
+    function validateWTKId(id) { return /^WTK-[A-Z]{4}-[0-9]{4}$/.test(id); }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CONTACTS
+    // ═══════════════════════════════════════════════════════════════
+    async function loadContactsFromServer() {
+      try {
+        const res = await fetch(`${BASE_URL}/api/contacts/${state.wtkId}`);
+        if (res.ok) {
+          const data = await res.json();
+          state.contacts = data.map(c => ({ id: c.id, name: c.name, online: c.online }));
+          return;
+        }
+      } catch (e) { }
+      // Fallback to localStorage
+      const saved = localStorage.getItem('wtk_contacts');
+      state.contacts = saved ? JSON.parse(saved) : [];
+    }
+
+    async function addContact(id, name) {
+      const existing = state.contacts.find(c => c.id === id);
+      if (!existing) {
+        state.contacts.unshift({ id, name: name || id, online: true });
+        if (state.contacts.length > 20) state.contacts.pop();
+        renderContacts();
+        // Persist on server
+        try {
+          await fetch(`${BASE_URL}/api/contacts/${state.wtkId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contact_id: id, contact_name: name }),
+          });
+        } catch (e) {
+          localStorage.setItem('wtk_contacts', JSON.stringify(state.contacts));
+        }
+      }
+    }
+
+    function updateContactOnline(wtk_id, online) {
+      const c = state.contacts.find(c => c.id === wtk_id);
+      if (c) { c.online = online; renderContacts(); }
+    }
+
+    function renderContacts() {
+      const list = document.getElementById('contacts-list');
+      if (state.contacts.length === 0) {
+        list.innerHTML = `<div style="font-family:var(--font-mono);font-size:11px;color:var(--text3);text-align:center;padding:12px;letter-spacing:2px;">NO RECENT CONTACTS</div>`;
+        return;
+      }
+      list.innerHTML = state.contacts.map(c => `
+        <div class="contact-item" onclick="quickConnect('${c.id}','${c.name}')">
+          <div class="contact-avatar">${getInitials(c.name)}</div>
+          <div class="contact-info">
+            <div class="contact-id">${c.id}</div>
+            <div class="contact-name">${c.name}</div>
+          </div>
+          <div class="online-dot ${c.online ? '' : 'offline'}"></div>
+          <div class="contact-arrow">›</div>
+        </div>`).join('');
+    }
+
+    function getInitials(name) {
+      return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SETTINGS
+    // ═══════════════════════════════════════════════════════════════
+    function loadSettings() {
+      state.username = localStorage.getItem('wtk_username') || '';
+      document.getElementById('settings-name').value = state.username;
+    }
+
+    async function saveSettings() {
+      state.username = document.getElementById('settings-name').value.trim().slice(0, 20);
+      localStorage.setItem('wtk_username', state.username);
+      // Sync name with server
+      try {
+        await fetch(`${BASE_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: state.username, wtk_id: state.wtkId }),
+        });
+      } catch (e) { }
+      closeModal('modal-settings');
+      showToast('Settings saved', 'success');
+    }
+
+    function showSettings() { openModal('modal-settings'); }
+
+    // ═══════════════════════════════════════════════════════════════
+    // NAVIGATION
+    // ═══════════════════════════════════════════════════════════════
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById('screen-' + id).classList.add('active');
+      state.currentScreen = id;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // WEBRTC CALL FLOW
+    // ═══════════════════════════════════════════════════════════════
+    const RTC_CONFIG = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+      ]
+    };
+
+    function initiateCall() {
+      const input = document.getElementById('connect-input');
+      const id = input.value.trim();
+      if (!validateWTKId(id)) { showToast('Invalid WTK ID format', 'error'); return; }
+      if (id === state.wtkId) { showToast('Cannot call yourself!', 'warn'); return; }
+      startCall(id, 'Unknown');
+      input.value = '';
+    }
+
+    function quickConnect(id, name) { startCall(id, name); }
+
+    async function startCall(peerId, peerName) {
+      state.callPeerId = peerId;
+      state.callPeerName = peerName || peerId;
+      addContact(peerId, peerName);
+
+      document.getElementById('call-peer-id-top').textContent = peerId;
+      document.getElementById('peer-avatar').textContent = getInitials(peerName || peerId);
+      document.getElementById('peer-name-display').textContent = peerName || 'Unknown';
+      document.getElementById('peer-id-display').textContent = peerId;
+      document.getElementById('peer-status').textContent = 'CONNECTING...';
+      showScreen('call');
+      setPTTState('idle');
+
+      // Build WebRTC peer connection (caller side)
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      state.pc = pc;
+
+      // Attach local audio tracks
+      if (state.micStream) {
+        state.micStream.getTracks().forEach(t => pc.addTrack(t, state.micStream));
+      }
+
+      // Receive remote audio
+      pc.ontrack = (ev) => {
+        document.getElementById('audio-remote').srcObject = ev.streams[0];
+        document.getElementById('peer-status').textContent = 'LISTENING';
+        startCallTimer();
+      };
+
+      pc.onicecandidate = (ev) => {
+        if (ev.candidate) wsSend({ type: 'ice_candidate', to: peerId, candidate: ev.candidate });
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'connected') {
+          showToast('Connected to ' + peerId, 'success');
+        }
+        if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
+          endCall();
+        }
+      };
+
+      const offer = await pc.createOffer({ offerToReceiveAudio: true });
+      await pc.setLocalDescription(offer);
+      wsSend({ type: 'call_offer', to: peerId, offer: pc.localDescription });
+    }
+
+    async function handleCallAnswered(fromId, answer) {
+      if (!state.pc) return;
+      await state.pc.setRemoteDescription(new RTCSessionDescription(answer));
+      document.getElementById('peer-status').textContent = 'LISTENING';
+      showToast('Connected!', 'success');
+    }
+
+    function endCall() {
+      wsSend({ type: 'call_end', to: state.callPeerId });
+      cleanupCall();
+    }
+
+    function cleanupCall() {
+      if (state.pc) { state.pc.close(); state.pc = null; }
+      stopCallTimer();
+      setPTTState('idle');
+      state.callPeerId = null;
+      state.callPeerName = null;
+      document.getElementById('peer-avatar').classList.remove('speaking');
+      document.getElementById('wave-viz').classList.remove('active');
+      if (state.currentScreen === 'call') showScreen('home');
+    }
+
+    function startCallTimer() {
+      state.callStartTime = Date.now();
+      state.callTimerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - state.callStartTime) / 1000);
+        const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const s = String(elapsed % 60).padStart(2, '0');
+        document.getElementById('call-timer').textContent = `${m}:${s}`;
+      }, 1000);
+    }
+
+    function stopCallTimer() {
+      if (state.callTimerInterval) { clearInterval(state.callTimerInterval); state.callTimerInterval = null; }
+      document.getElementById('call-timer').textContent = '00:00';
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // INCOMING CALL (callee side)
+    // ═══════════════════════════════════════════════════════════════
+    function showIncomingCall(id, name, offer) {
+      state.incomingCallId = id;
+      state.incomingCallName = name;
+      state.incomingOffer = offer;
+      document.getElementById('incoming-id').textContent = id;
+      document.getElementById('incoming-name').textContent = name || 'Unknown caller';
+      openModal('modal-incoming');
+      playBeep('join');
+    }
+
+    async function acceptCall() {
+      closeModal('modal-incoming');
+      const peerId = state.incomingCallId;
+      const peerName = state.incomingCallName;
+      const offer = state.incomingOffer;
+
+      state.callPeerId = peerId;
+      state.callPeerName = peerName;
+      addContact(peerId, peerName);
+
+      document.getElementById('call-peer-id-top').textContent = peerId;
+      document.getElementById('peer-avatar').textContent = getInitials(peerName || peerId);
+      document.getElementById('peer-name-display').textContent = peerName || 'Unknown';
+      document.getElementById('peer-id-display').textContent = peerId;
+      document.getElementById('peer-status').textContent = 'CONNECTED';
+      showScreen('call');
+      setPTTState('idle');
+
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      state.pc = pc;
+
+      if (state.micStream) {
+        state.micStream.getTracks().forEach(t => pc.addTrack(t, state.micStream));
+      }
+
+      pc.ontrack = (ev) => {
+        document.getElementById('audio-remote').srcObject = ev.streams[0];
+        startCallTimer();
+      };
+
+      pc.onicecandidate = (ev) => {
+        if (ev.candidate) wsSend({ type: 'ice_candidate', to: peerId, candidate: ev.candidate });
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) endCall();
+      };
+
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      wsSend({ type: 'call_answer', to: peerId, answer: pc.localDescription });
+      showToast('Call connected!', 'success');
+    }
+
+    function declineCall() {
+      closeModal('modal-incoming');
+      wsSend({ type: 'call_declined', to: state.incomingCallId });
+      state.incomingCallId = null;
+      state.incomingCallName = null;
+      showToast('Call declined', 'error');
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ROOM FLOW
+    // ═══════════════════════════════════════════════════════════════
+    async function createRoom() {
+      try {
+        const res = await fetch(`${BASE_URL}/api/rooms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wtk_id: state.wtkId, name: state.username || 'You' }),
+        });
+        const data = await res.json();
+        joinRoomWithCode(data.code);
+        showToast(`Room #${data.code} created! Share the code.`, 'success');
+      } catch (e) {
+        // Offline fallback
+        const code = String(Math.floor(Math.random() * 9000) + 1000);
+        joinRoomWithCode(code);
+        showToast(`Room #${code} created (offline mode)`, 'success');
+      }
+    }
+
+    function showJoinRoom() { openModal('modal-join-room'); }
+
+    async function confirmJoinRoom() {
+      const code = document.getElementById('join-code-input').value.trim();
+      if (code.length !== 4 || !/^\d{4}$/.test(code)) { showToast('Enter a valid 4-digit code', 'error'); return; }
+      closeModal('modal-join-room');
+      document.getElementById('join-code-input').value = '';
+
+      try {
+        const res = await fetch(`${BASE_URL}/api/rooms/${code}/join`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wtk_id: state.wtkId, name: state.username || 'You' }),
+        });
+        if (!res.ok) { showToast('Room not found', 'error'); return; }
+        const data = await res.json();
+        // Populate room users from server response
+        joinRoomWithCode(code, data.users);
+      } catch (e) {
+        joinRoomWithCode(code);
+      }
+    }
+
+    function joinRoomWithCode(code, serverUsers) {
+      state.currentRoomCode = code;
+      document.getElementById('room-code-top').textContent = '#' + code;
+      document.getElementById('room-code-display').textContent = '#' + code;
+
+      if (serverUsers && serverUsers.length > 0) {
+        state.roomUsers = serverUsers.map(u => ({
+          id: u.wtk_id, name: u.name, me: u.wtk_id === state.wtkId
+        }));
+      } else {
+        state.roomUsers = [{ id: state.wtkId, name: state.username || 'You', me: true }];
+      }
+      renderRoomUsers();
+      showScreen('room');
+      setPTTState('idle', 'room');
+    }
+
+    function renderRoomUsers() {
+      const grid = document.getElementById('room-users-grid');
+      document.getElementById('room-user-count').textContent = state.roomUsers.length;
+      grid.innerHTML = state.roomUsers.map(u => `
+        <div class="room-user-tile">
+          <div class="room-user-avatar ${u.me ? 'me' : ''}" id="ru-${u.id.replace(/[^a-z0-9]/gi, '')}">
+            ${getInitials(u.name)}
+          </div>
+          <div class="room-user-name">${u.me ? 'You' : u.name.split(' ')[0]}</div>
+        </div>`).join('');
+    }
+
+    async function leaveRoom() {
+      setPTTState('idle', 'room');
+      disableMic();
+      try {
+        await fetch(`${BASE_URL}/api/rooms/${state.currentRoomCode}/leave`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wtk_id: state.wtkId, name: state.username || 'You' }),
+        });
+      } catch (e) { }
+      state.currentRoomCode = null;
+      state.roomUsers = [];
+      showScreen('home');
+      showToast('Left the room', 'error');
+    }
+
+    function copyRoomCode() {
+      navigator.clipboard.writeText(state.currentRoomCode || '').catch(() => { });
+      showToast(`Room code #${state.currentRoomCode} copied!`, 'success');
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PTT STATE MACHINE
+    // ═══════════════════════════════════════════════════════════════
+    function setPTTState(newState, context = 'call') {
+      const btnId = context === 'room' ? 'room-ptt-btn' : 'ptt-btn';
+      const labelId = context === 'room' ? 'room-ptt-label' : 'ptt-label';
+      const btn = document.getElementById(btnId);
+      const label = document.getElementById(labelId);
+      const micIcon = btn.querySelector('.mic-icon');
+      btn.className = `ptt-btn ${newState}`;
+      if (context === 'room') state.roomPttState = newState;
+      else state.pttState = newState;
+      const labels = {
+        idle: { text: 'HOLD TO TALK', mic: '🎙' },
+        requesting: { text: 'CONNECTING\n···', mic: '⏳' },
+        transmitting: { text: 'TRANSMITTING\n▶▶▶', mic: '🔴' },
+        busy: { text: 'CHANNEL BUSY', mic: '🔇' },
+      };
+      const cfg = labels[newState] || labels.idle;
+      label.textContent = cfg.text;
+      micIcon.textContent = cfg.mic;
+    }
+
+    let pttTimeout = null;
+
+    function pttPress(evOrCtx, ctx) {
+      if (typeof evOrCtx === 'string') ctx = evOrCtx;
+      if (typeof evOrCtx === 'object' && evOrCtx && evOrCtx.preventDefault) evOrCtx.preventDefault();
+      const context = ctx || 'call';
+      const currentState = context === 'room' ? state.roomPttState : state.pttState;
+      if (currentState === 'transmitting' || currentState === 'requesting') return;
+      if (currentState === 'busy') { showToast('Channel busy — wait for speaker to finish', 'warn'); return; }
+
+      setPTTState('requesting', context);
+      playBeep('click');
+
+      if (context === 'room') {
+        // Ask server for PTT token
+        wsSend({ type: 'ptt_request', room_code: state.currentRoomCode });
+        // Server will reply with ptt_granted or ptt_denied
+      } else {
+        // 1-to-1 call: grant immediately
+        pttTimeout = setTimeout(() => {
+          setPTTState('transmitting', context);
+          enableMic();
+          document.getElementById('wave-viz').classList.add('active');
+          playBeep('start');
+          pttTimeout = setTimeout(() => pttRelease(null, context), 60000);
+        }, 200);
+      }
+    }
+
+    function pttRelease(evOrCtx, ctx) {
+      if (typeof evOrCtx === 'string') ctx = evOrCtx;
+      if (typeof evOrCtx === 'object' && evOrCtx && evOrCtx.preventDefault) evOrCtx.preventDefault();
+      const context = ctx || 'call';
+      const currentState = context === 'room' ? state.roomPttState : state.pttState;
+      if (pttTimeout) { clearTimeout(pttTimeout); pttTimeout = null; }
+      if (currentState === 'transmitting') {
+        playBeep('end');
+        disableMic();
+        if (context === 'room') {
+          wsSend({ type: 'ptt_release', room_code: state.currentRoomCode });
+          document.getElementById('room-wave-viz').classList.remove('active');
+          document.getElementById('room-speaker-label').textContent = 'CHANNEL CLEAR';
+        } else {
+          document.getElementById('wave-viz').classList.remove('active');
+        }
+      }
+      if (context === 'room' && currentState === 'requesting') {
+        // Cancelled before server granted
+        wsSend({ type: 'ptt_release', room_code: state.currentRoomCode });
+      }
+      setPTTState('idle', context);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // AUDIO / MIC
+    // ═══════════════════════════════════════════════════════════════
+    async function requestMicPermission() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: false,
+        });
+        state.micStream = stream;
+        stream.getAudioTracks().forEach(t => t.enabled = false);
+      } catch (e) { console.warn('Mic unavailable:', e); }
+    }
+
+    function enableMic() {
+      state.micStream?.getAudioTracks().forEach(t => t.enabled = true);
+    }
+    function disableMic() {
+      state.micStream?.getAudioTracks().forEach(t => t.enabled = false);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // BEEP SOUNDS
+    // ═══════════════════════════════════════════════════════════════
+    let audioCtx = null;
+    function getAudioCtx() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+    function playBeep(type) {
+      try {
+        const ctx = getAudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        const configs = {
+          start: { freq: 880, dur: 0.08, type: 'square', vol: 0.3 },
+          end: { freq: 440, dur: 0.12, type: 'square', vol: 0.3 },
+          click: { freq: 660, dur: 0.05, type: 'sine', vol: 0.2 },
+          busy: { freq: 330, dur: 0.3, type: 'sawtooth', vol: 0.2 },
+          join: { freq: 1200, dur: 0.1, type: 'sine', vol: 0.15 },
+        };
+        const cfg = configs[type] || configs.click;
+        osc.type = cfg.type;
+        osc.frequency.setValueAtTime(cfg.freq, ctx.currentTime);
+        gain.gain.setValueAtTime(cfg.vol, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + cfg.dur);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + cfg.dur);
+      } catch (e) { }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // KEYBOARD PTT (SPACE BAR)
+    // ═══════════════════════════════════════════════════════════════
+    function setupKeyboardPTT() {
+      let spaceHeld = false;
+      document.addEventListener('keydown', e => {
+        if (e.code === 'Space' && !spaceHeld && !e.repeat) {
+          if (e.target.tagName === 'INPUT') return;
+          e.preventDefault(); spaceHeld = true;
+          const ctx = state.currentScreen === 'room' ? 'room' : 'call';
+          if (state.currentScreen === 'call' || state.currentScreen === 'room') pttPress(ctx);
+        }
+      });
+      document.addEventListener('keyup', e => {
+        if (e.code === 'Space' && spaceHeld) {
+          e.preventDefault(); spaceHeld = false;
+          const ctx = state.currentScreen === 'room' ? 'room' : 'call';
+          if (state.currentScreen === 'call' || state.currentScreen === 'room') pttRelease(ctx);
+        }
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SHARE / COPY / QR
+    // ═══════════════════════════════════════════════════════════════
+    function copyId() {
+      navigator.clipboard.writeText(state.wtkId).catch(() => { });
+      showToast('WTK ID copied!', 'success');
+    }
+    async function shareId() {
+      const data = { title: 'Connect with me on WalkieTalk', text: `My WalkieTalk ID: ${state.wtkId}`, url: window.location.href };
+      if (navigator.share) { try { await navigator.share(data); } catch (e) { } }
+      else { copyId(); showToast('Link copied — share it with a friend!', 'success'); }
+    }
+    function toggleQR() {
+      state.qrVisible = !state.qrVisible;
+      document.getElementById('qr-row').style.display = state.qrVisible ? 'flex' : 'none';
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MODALS
+    // ═══════════════════════════════════════════════════════════════
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    document.querySelectorAll('.modal-overlay').forEach(o => {
+      o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // TOAST
+    // ═══════════════════════════════════════════════════════════════
+    function showToast(msg, type = '') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      const icons = { success: '✓', error: '✕', warn: '⚠' };
+      toast.textContent = (icons[type] || '◈') + ' ' + msg;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // START
+    // ═══════════════════════════════════════════════════════════════
+    init();
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CHANAKSH · ACCESS TERMINAL</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap"
+    rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --green: #00ff41;
+      --cyan: #00ffff;
+      --orange: #ff6600;
+      --red: #ff0000;
+      --dark-green: #003300;
+      --bg: #000;
+      --panel: #000a00;
+    }
+
+    body,
+    html {
+      background: var(--bg);
+      min-height: 100vh;
+      min-height: 100dvh;
+      width: 100%;
+      font-family: 'Share Tech Mono', monospace;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    /* ── MATRIX BG ── */
+    #matrix {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
+    /* ── SCANLINES ── */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.07) 2px, rgba(0, 0, 0, 0.07) 4px);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── CENTRE WRAPPER ── */
+    .terminal-wrap {
+      position: relative;
+      z-index: 2;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      padding: 16px;
+    }
+
+    /* ── TOP BADGE ── */
+    .top-badge {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      letter-spacing: 5px;
+      color: var(--orange);
+      border: 1px solid var(--orange);
+      padding: 4px 18px;
+      border-radius: 2px;
+      text-shadow: 0 0 8px #ff660088;
+      margin-bottom: 28px;
+      animation: flicker 3s infinite;
+    }
+
+    /* ── MAIN CARD ── */
+    .card {
+      width: min(520px, 100%);
+      border: 2px solid var(--green);
+      border-radius: 4px;
+      background: rgba(0, 8, 0, 0.92);
+      backdrop-filter: blur(4px);
+      box-shadow: 0 0 40px #00ff4133, 0 0 80px #00ff410d, inset 0 0 30px #00ff4108;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--green), transparent);
+      animation: scanH 2s linear infinite;
+    }
+
+    @keyframes scanH {
+      0% {
+        opacity: 0.3
+      }
+
+      50% {
+        opacity: 1
+      }
+
+      100% {
+        opacity: 0.3
+      }
+    }
+
+    /* ── CARD HEADER ── */
+    .card-header {
+      padding: 22px 28px 16px;
+      border-bottom: 1px solid var(--dark-green);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .sys-label {
+      font-size: 9px;
+      color: #555;
+      letter-spacing: 3px;
+      margin-bottom: 4px;
+    }
+
+    .event-logo {
+      font-family: 'Orbitron', monospace;
+      font-size: 38px;
+      font-weight: 900;
+      color: var(--green);
+      letter-spacing: 6px;
+      text-shadow: 0 0 20px var(--green);
+      animation: glitch 4s infinite;
+    }
+
+    @keyframes glitch {
+
+      0%,
+      88%,
+      100% {
+        text-shadow: 0 0 20px var(--green);
+        transform: none;
+      }
+
+      90% {
+        text-shadow: -3px 0 var(--red), 3px 0 var(--cyan);
+        transform: translate(-2px, 0);
+      }
+
+      92% {
+        text-shadow: 3px 0 var(--red), -3px 0 var(--cyan);
+        transform: translate(2px, 0);
+      }
+
+      94% {
+        text-shadow: 0 0 20px var(--green);
+        transform: none;
+      }
+    }
+
+    .event-sub {
+      font-size: 11px;
+      color: #00ccff;
+      letter-spacing: 3px;
+      margin-top: 2px;
+    }
+
+    .event-tag {
+      font-size: 10px;
+      color: #555;
+      letter-spacing: 1px;
+      margin-top: 2px;
+    }
+
+    /* ── CARD BODY ── */
+    .card-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ── TERMINAL LOG ── */
+    .term-log {
+      background: #00050000;
+      border: 1px solid #001a00;
+      border-radius: 2px;
+      padding: 10px 12px;
+      font-size: 10px;
+      color: #008800;
+      line-height: 2;
+      min-height: 64px;
+    }
+
+    .term-log .prompt {
+      color: var(--green);
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 8px;
+      height: 12px;
+      background: var(--green);
+      animation: blink 1s step-end infinite;
+      vertical-align: middle;
+      margin-left: 2px;
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0
+      }
+    }
+
+    /* ── FORM SECTION ── */
+    .form-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .field-label {
+      font-size: 9px;
+      color: #666;
+      letter-spacing: 3px;
+      margin-bottom: 4px;
+    }
+
+    .input-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      border: 1px solid #003300;
+      border-radius: 2px;
+      background: #000800;
+      overflow: hidden;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    .input-row:focus-within {
+      border-color: var(--green);
+      box-shadow: 0 0 12px #00ff4133;
+    }
+
+    .input-prefix {
+      padding: 0 12px;
+      font-size: 13px;
+      color: var(--green);
+      background: #001500;
+      border-right: 1px solid #002200;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      user-select: none;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    input[type=text] {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--cyan);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 16px;
+      /* 16px prevents iOS zoom */
+      padding: 0 12px;
+      height: 48px;
+      letter-spacing: 2px;
+      caret-color: var(--green);
+      min-width: 0;
+    }
+
+    input[type=text]::placeholder {
+      color: #1a3a1a;
+      font-size: 13px;
+      letter-spacing: 1px;
+    }
+
+    /* ── ACCESS BTN ── */
+    .access-btn {
+      position: relative;
+      padding: 14px 8px;
+      width: 100%;
+      background: transparent;
+      border: 1px solid var(--green);
+      border-radius: 2px;
+      color: var(--green);
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(9px, 2.5vw, 12px);
+      font-weight: 700;
+      letter-spacing: clamp(2px, 1vw, 6px);
+      cursor: pointer;
+      overflow: hidden;
+      transition: all 0.3s;
+      text-transform: uppercase;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    .access-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, #00ff4122, transparent);
+      transition: left 0.4s;
+    }
+
+    .access-btn:hover::before {
+      left: 100%;
+    }
+
+    .access-btn:hover {
+      background: #00ff4111;
+      box-shadow: 0 0 20px #00ff4144;
+      color: #fff;
+    }
+
+    .access-btn:disabled {
+      border-color: #222;
+      color: #333;
+      cursor: not-allowed;
+    }
+
+    .access-btn:disabled::before {
+      display: none;
+    }
+
+    /* ── BOOT PROGRESS ── */
+    .progress-bar {
+      height: 2px;
+      background: #001500;
+      border-radius: 1px;
+      overflow: hidden;
+      display: none;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      transition: width 0.05s linear;
+    }
+
+    /* ── STATUS STRIP ── */
+    .status-strip {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 10px 16px;
+      border-top: 1px solid var(--dark-green);
+      font-size: 8px;
+      color: #333;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: pulse 2s infinite;
+      margin-right: 6px;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0.4
+      }
+    }
+
+    /* ── CORNERS ── */
+    .corner {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-color: var(--green);
+      border-style: solid;
+    }
+
+    .corner.tl {
+      top: 8px;
+      left: 8px;
+      border-width: 2px 0 0 2px;
+    }
+
+    .corner.tr {
+      top: 8px;
+      right: 8px;
+      border-width: 2px 2px 0 0;
+    }
+
+    .corner.bl {
+      bottom: 8px;
+      left: 8px;
+      border-width: 0 0 2px 2px;
+    }
+
+    .corner.br {
+      bottom: 8px;
+      right: 8px;
+      border-width: 0 2px 2px 0;
+    }
+
+    /* ── REDIRECT OVERLAY ── */
+    #redirect-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      z-index: 999;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .redir-name {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(22px, 5vw, 40px);
+      font-weight: 900;
+      color: var(--green);
+      letter-spacing: 6px;
+      text-shadow: 0 0 30px var(--green);
+      animation: glitch 1.5s infinite;
+    }
+
+    .redir-msg {
+      font-size: clamp(10px, 3vw, 13px);
+      color: var(--cyan);
+      letter-spacing: 2px;
+      text-align: center;
+      padding: 0 16px;
+    }
+
+    .redir-bar {
+      width: min(280px, 80vw);
+      height: 3px;
+      background: #001500;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .redir-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+      animation: fillUp 2s linear forwards;
+    }
+
+    @keyframes fillUp {
+      to {
+        width: 100%;
+      }
+    }
+
+    .access-granted {
+      font-size: 10px;
+      color: var(--orange);
+      letter-spacing: 4px;
+      animation: flicker 0.4s infinite;
+    }
+
+    @keyframes flicker {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0.3
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <canvas id="matrix"></canvas>
+
+  <div class="terminal-wrap">
+    <div class="card">
+      <!-- corner accents -->
+      <div class="corner tl"></div>
+      <div class="corner tr"></div>
+      <div class="corner bl"></div>
+      <div class="corner br"></div>
+
+      <div class="card-body">
+        <!-- terminal log -->
+        <div class="term-log" id="term-log">
+          <span class="prompt">&gt; </span>SYSTEM READY. AWAITING PARTICIPANT ID...<br>
+          <span class="prompt">&gt; </span><span class="cursor"></span>
+        </div>
+
+        <!-- input -->
+        <div class="form-section">
+          <div class="field-label">// PARTICIPANT NAME</div>
+          <div class="input-row">
+            <div class="input-prefix">&gt;_</div>
+            <input type="text" id="name-input" placeholder="Enter your name..." maxlength="40" autocomplete="off"
+              spellcheck="false">
+          </div>
+          <div class="progress-bar" id="prog-bar">
+            <div class="progress-fill" id="prog-fill"></div>
+          </div>
+          <button class="access-btn" id="access-btn" onclick="handleAccess()">
+            ▶ &nbsp; REQUEST ACCESS
+          </button>
+        </div>
+      </div>
+
+      <div class="status-strip">
+        <span><span class="status-dot"></span>ONLINE · CHANAKSH.SYS</span>
+        <span id="node-time">--:--:--</span>
+        <span>NODES: 8 ACTIVE</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- REDIRECT OVERLAY -->
+  <div id="redirect-overlay">
+    <div class="access-granted">⚡ ACCESS GRANTED ⚡</div>
+    <div class="redir-name" id="redir-name"></div>
+    <div class="redir-msg">LAUNCHING YOUR ENVIRONMENT...</div>
+    <div class="redir-bar">
+      <div class="redir-fill"></div>
+    </div>
+    <div style="font-size:9px;color:#333;letter-spacing:2px;margin-top:8px;">REDIRECTING YOUR ENVIRONMENT</div>
+  </div>
+
+  <script>
+    /* ── MATRIX RAIN ── */
+    const canvas = document.getElementById('matrix');
+    const ctx = canvas.getContext('2d');
+    function resize() { canvas.width = innerWidth; canvas.height = innerHeight; }
+    resize(); window.addEventListener('resize', resize);
+    const chars = 'アイウエオカキクケコ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ<>{}[]#!/\\|=+-*';
+    const colW = window.innerWidth < 480 ? 12 : 16;
+    let drops = [];
+    function initDrops() { drops = Array(Math.floor(canvas.width / colW)).fill(1); }
+    initDrops();
+    setInterval(() => {
+      ctx.fillStyle = 'rgba(0,0,0,0.05)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.font = (colW - 2) + 'px Share Tech Mono';
+      drops.forEach((y, i) => {
+        const ch = chars[Math.floor(Math.random() * chars.length)];
+        ctx.fillStyle = Math.random() > .97 ? '#ffffff' : '#00ff41';
+        ctx.fillText(ch, i * colW, y * colW);
+        if (y * colW > canvas.height && Math.random() > .975) drops[i] = 0;
+        drops[i]++;
+      });
+    }, 40);
+    window.addEventListener('resize', initDrops);
+
+    /* ── CLOCK ── */
+    function updateClock() {
+      const now = new Date();
+      const t = [now.getHours(), now.getMinutes(), now.getSeconds()]
+        .map(n => String(n).padStart(2, '0')).join(':');
+      document.getElementById('node-time').textContent = t;
+    }
+    setInterval(updateClock, 1000); updateClock();
+
+    /* ── TERMINAL TYPE EFFECT ── */
+    const termLog = document.getElementById('term-log');
+    const input = document.getElementById('name-input');
+    const logLines = [
+      'SCANNING ENVIRONMENT...',
+      'FIREWALL BYPASSED.',
+      'ENCRYPTION PROTOCOL ACTIVE.',
+      'AWAITING PARTICIPANT IDENTIFICATION...'
+    ];
+    let li = 0;
+    function addLog(msg, color = '#008800') {
+      const prompt = document.createElement('span');
+      prompt.style.color = '#00ff41'; prompt.textContent = '> ';
+      const text = document.createElement('span');
+      text.style.color = color; text.textContent = msg;
+      const br = document.createElement('br');
+      termLog.appendChild(prompt); termLog.appendChild(text); termLog.appendChild(br);
+    }
+    function runBootLog() {
+      if (li < logLines.length) {
+        addLog(logLines[li++]);
+        setTimeout(runBootLog, 350);
+      }
+    }
+    setTimeout(runBootLog, 400);
+
+    /* ── INPUT LIVE FEEDBACK ── */
+    input.addEventListener('input', () => {
+      const val = input.value.trim();
+      const btn = document.getElementById('access-btn');
+      btn.disabled = val.length === 0;
+      if (val.length === 0) {
+        btn.textContent = '▶   REQUEST ACCESS';
+      } else {
+        btn.textContent = `▶   ACCESS AS "${val.toUpperCase()}"`;
+      }
+    });
+
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') handleAccess(); });
+
+    /* ── ACCESS HANDLER ── */
+    function handleAccess() {
+      const name = input.value.trim();
+      if (!name) return;
+
+      input.disabled = true;
+      document.getElementById('access-btn').disabled = true;
+
+      addLog('PARTICIPANT ID: ' + name.toUpperCase(), '#00ffff');
+      addLog('VERIFYING IDENTITY...', '#ff6600');
+
+      const bar = document.getElementById('prog-bar');
+      const fill = document.getElementById('prog-fill');
+      bar.style.display = 'block';
+      let p = 0;
+      const prog = setInterval(() => {
+        p += Math.random() * 8;
+        if (p >= 100) { p = 100; clearInterval(prog); showRedirect(name); }
+        fill.style.width = p + '%';
+      }, 60);
+    }
+
+    function showRedirect(name) {
+      setTimeout(() => {
+        addLog('ACCESS GRANTED. LAUNCHING...', '#00ff41');
+        setTimeout(() => {
+          const overlay = document.getElementById('redirect-overlay');
+          document.getElementById('redir-name').textContent = name.toUpperCase();
+          overlay.style.display = 'flex';
+          // Save name so index.html picks it up immediately on load
+          localStorage.setItem('wtk_username', name);
+          sessionStorage.setItem('participant_name', name);
+          // Use /app when served by FastAPI; fall back to index.html for direct file open
+          setTimeout(() => {
+            var target = window.location.protocol === 'file:' ? 'index.html' : '/app';
+            window.location.href = target;
+          }, 2200);
+        }, 500);
+      }, 400);
+    }
+
+    /* ── BTN INITIAL STATE & event binding ── */
+    var accessBtn = document.getElementById('access-btn');
+    accessBtn.disabled = true;
+    accessBtn.addEventListener('click', handleAccess);
+  </script>
+</body>
+
+</html>
