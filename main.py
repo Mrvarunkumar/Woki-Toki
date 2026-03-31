@@ -440,6 +440,81 @@ async def handle_ws_message(sender_id: str, msg: dict):
         })
         log.info(f"call_end: {sender_id} → {to}")
 
+    # ── Room WebRTC Mesh Signaling ────────────────────────────────────────────
+    elif msg_type == "room_offer":
+        to = msg.get("to")
+        room_code = msg.get("room_code")
+        if to and to in connections and room_code in rooms and sender_id in rooms.get(room_code, {}).get("users", []):
+            await send_to(to, {
+                "type": "room_offer",
+                "from_id": sender_id,
+                "room_code": room_code,
+                "offer": msg.get("offer"),
+            })
+
+    elif msg_type == "room_answer":
+        to = msg.get("to")
+        room_code = msg.get("room_code")
+        if to and to in connections:
+            await send_to(to, {
+                "type": "room_answer",
+                "from_id": sender_id,
+                "room_code": room_code,
+                "answer": msg.get("answer"),
+            })
+
+    elif msg_type == "room_ice_candidate":
+        to = msg.get("to")
+        room_code = msg.get("room_code")
+        if to and to in connections:
+            await send_to(to, {
+                "type": "room_ice_candidate",
+                "from_id": sender_id,
+                "room_code": room_code,
+                "candidate": msg.get("candidate"),
+            })
+
+    # ── Whisper (private 1-to-1 audio inside a room) ─────────────────────────
+    elif msg_type == "whisper_offer":
+        to = msg.get("to")
+        if to and to in connections:
+            await send_to(to, {
+                "type": "whisper_offer",
+                "from_id": sender_id,
+                "from_name": msg.get("from_name", sender_id),
+                "offer": msg.get("offer"),
+            })
+            log.info(f"whisper_offer: {sender_id} → {to}")
+
+    elif msg_type == "whisper_answer":
+        to = msg.get("to")
+        if to and to in connections:
+            await send_to(to, {
+                "type": "whisper_answer",
+                "from_id": sender_id,
+                "answer": msg.get("answer"),
+            })
+
+    elif msg_type == "whisper_ice":
+        to = msg.get("to")
+        if to and to in connections:
+            await send_to(to, {
+                "type": "whisper_ice",
+                "from_id": sender_id,
+                "candidate": msg.get("candidate"),
+            })
+
+    elif msg_type == "whisper_declined":
+        to = msg.get("to")
+        if to and to in connections:
+            await send_to(to, {"type": "whisper_declined", "from_id": sender_id})
+
+    elif msg_type == "whisper_ended":
+        to = msg.get("to")
+        if to and to in connections:
+            await send_to(to, {"type": "whisper_ended", "from_id": sender_id})
+            log.info(f"whisper_ended: {sender_id} → {to}")
+
     # ── PTT (Push-to-Talk) ────────────────────────────────────────────────────
     elif msg_type == "ptt_request":
         room_code = msg.get("room_code")
